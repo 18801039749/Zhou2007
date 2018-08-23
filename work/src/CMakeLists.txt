@@ -5,6 +5,8 @@
 
 SET(sources
 	"thin_plate.hpp"
+	"ppa.hpp"
+	"kruskal.hpp"
 
 	"eigen.hpp"
 	"main.cpp"

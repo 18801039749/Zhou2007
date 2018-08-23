@@ -35,7 +35,7 @@ namespace zhou {
 		// thin plate spline kernel : k(p,q) = d=distance(p,q), d^2 ln(d)
 		T thinPlateKernal(const VecT &p, const VecT &q) const {
 			double d = cv::norm(p, q);
-			T r = d * d * log(d);
+			T r = 2 * d * d * log(d);
 			return (r != r) ? T(0) : r;
 		}
 
@@ -110,9 +110,9 @@ namespace zhou {
 			//     [ .. ]
 			//     [ wn ]
 			m_weights0.clear();
-			m_weights0.reserve(m_samples.size() + 3);
+			m_weights0.reserve(m_samples.size());
 			m_weights1.clear();
-			m_weights1.reserve(m_samples.size() + 3);
+			m_weights1.reserve(m_samples.size());
 			for (int i = 0; i < m_samples.size(); i++) {
 				m_weights0.push_back(X0(i));
 				m_weights1.push_back(X1(i));
@@ -131,10 +131,12 @@ namespace zhou {
 			m_energy = W0.transpose() * K * W0;
 			m_energy += W1.transpose() * K * W1;
 
-			 std::cout << "W0" << W0 << std::endl;
-			 std::cout << "W1" << W1 << std::endl;
-			 std::cout << "K" << K << std::endl;
-			 std::cout << "m_energy" << m_energy << std::endl << std::endl;
+			 //std::cout << "W0" << W0 << std::endl;
+			 //std::cout << "a0" << m_a0 << std::endl;
+			 //std::cout << "W1" << W1 << std::endl;
+			 //std::cout << "a1" << m_a1 << std::endl;
+			 //std::cout << "K" << K << std::endl;
+			 //std::cout << "m_energy" << m_energy << std::endl << std::endl;
 		}
 
 
