@@ -47,7 +47,6 @@ namespace kruskal {
 
 	template <typename T>
 	struct edge_traits {
-
 		static int id1(const T &e) { return e.id1; }
 		static int id2(const T &e) { return e.id2; }
 		static float weight(const T &e) { return e.weight; }
