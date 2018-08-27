@@ -7,6 +7,7 @@
 
 // opencv
 #include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
 // project
 #include "kruskal.hpp"
@@ -50,22 +51,24 @@ public:
 	static const int RIDGE_FEATURES = 1;
 	static const int VALLEY_FEATURES = -1;
 
-	FeatureGraph(cv::Mat m, int profile_length = 7, int feature_type = RIDGE_FEATURES) {
+	FeatureGraph(cv::Mat input, int profile_length = 7, int feature_type = RIDGE_FEATURES) {
 		using namespace cv;
 		using namespace std;
 
+		// reduce down to operational grid
+		Mat grid;
+		resize(input, grid, input.size() / 5, 0, 0, INTER_NEAREST);
+
 		// inside region
-		Rect m_rect(Point(0, 0), m.size());
+		Rect grid_rect(Point(0, 0), grid.size());
 
 		// work out the threshold for comparison
 		double mmin, mmax;
-		minMaxIdx(m, &mmin, &mmax);
+		minMaxIdx(input, &mmin, &mmax);
 		double thresh = 0.01*(mmax - mmin);
 
-		Mat m;
-
 		int nodeidcounter = 0;
-		Mat nodeids(m.rows, m.cols, CV_32SC1, Scalar(-1));
+		Mat nodeids(grid.rows, grid.cols, CV_32SC1, Scalar(-1));
 
 		// Foward neighbours
 		Point fneighbours[] = {
@@ -77,10 +80,10 @@ public:
 
 		// select feature points
 		//
-		for (int i = 0; i < m.rows; i++) {
-			for (int j = 0; j < m.cols; j++) {
+		for (int i = 0; i < grid.rows; i++) {
+			for (int j = 0; j < grid.cols; j++) {
 				Point p(j, i);
-				float e = m.at<float>(p);
+				float e = grid.at<float>(p);
 
 				// neighbours
 				for (Point n : fneighbours) {
@@ -89,8 +92,8 @@ public:
 					bool profile0 = 0, profile1 = 0;
 					for (int l = 1; l < profile_length / 2; l++) {
 						Point delta = n * l;
-						profile0 |= m_rect.contains(p + delta) && e - m.at<float>(p + delta) * feature_type > thresh;
-						profile1 |= m_rect.contains(p - delta) && e - m.at<float>(p - delta) * feature_type > thresh;
+						profile0 |= grid_rect.contains(p + delta) && e - grid.at<float>(p + delta) * feature_type > thresh;
+						profile1 |= grid_rect.contains(p - delta) && e - grid.at<float>(p - delta) * feature_type > thresh;
 					}
 					if (profile0 && profile1) {
 						nodeids.at<int>(p) = nodeidcounter++;
@@ -103,14 +106,14 @@ public:
 		// create graph
 		//
 		vector<edge> tempedges;
-		for (int i = 0; i < m.rows - 1; i++) {
-			for (int j = 0; j < m.cols - 1; j++) {
+		for (int i = 0; i < grid.rows - 1; i++) {
+			for (int j = 0; j < grid.cols - 1; j++) {
 				Point p(j, i);
 				int pid = nodeids.at<int>(p) < 0;
 				if (pid) continue;
 				for (Point n : fneighbours) {
 					Point q = p + n;
-					if (m_rect.contains(q) && nodeids.at<int>(p) >= 0) {
+					if (grid_rect.contains(q) && nodeids.at<int>(p) >= 0) {
 						// create an edge
 						tempedges.push_back(edge{ 0.f, pid, nodeids.at<int>(p), p, q });
 					}
@@ -125,7 +128,7 @@ public:
 		// reduce graph
 		//
 		for (int i = 0; i < profile_length / 2; i++) {
-			Mat degree(m.rows, m.cols, CV_32SC1, Scalar(0));
+			Mat degree(grid.rows, grid.cols, CV_32SC1, Scalar(0));
 			for (const edge &e : tempedges) {
 				degree.at<int>(e.p1)++;
 				degree.at<int>(e.p2)++;
@@ -144,18 +147,20 @@ public:
 		for (const edge &e : tempedges) {
 			nodetoedge[e.id1].push_back(e);
 			nodetoedge[e.id2].push_back(e);
-
-			// todo smooth
-			smoothPosition[e.id1] += Vec2f(e.p1.x, e.p1.y);
-			smoothPosition[e.id2] += Vec2f(e.p2.x, e.p2.y);
+			smoothPosition[e.id1] += Vec2f(e.p2.x, e.p2.y);
+			smoothPosition[e.id2] += Vec2f(e.p1.x, e.p1.y);
 		}
+		for (auto &p : smoothPosition) {
+			p.second = p.second / float(nodetoedge[p.first].size());
+		}
+		
 
 		
 
 		// convert to node/path
 		unordered_set<int> visited;
-		for (int i = 0; i < m.rows; i++) {
-			for (int j = 0; j < m.cols; j++) {
+		for (int i = 0; i < grid.rows; i++) {
+			for (int j = 0; j < grid.cols; j++) {
 				
 				// find a node in the forest to start from
 				Point p(j, i);
