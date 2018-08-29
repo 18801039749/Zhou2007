@@ -1,12 +1,12 @@
+#pragma once
 
-
+// std
 #include <queue>
 #include <iostream>
 
-
 namespace kruskal {
 
-	//class implementing Union Find Data Structure with Path Compression
+	// class implementing Union-Find data structure with path compression
 	class UnionFind {
 	  public:
 
@@ -21,7 +21,7 @@ namespace kruskal {
 		
 		int root(int i) {
 			while(i != id[i]) {
-				id[i] = id[id[i]];	//path Compression
+				id[i] = id[id[i]]; // path compression
 				i = id[i];
 			}
 			return i;
@@ -52,15 +52,13 @@ namespace kruskal {
 		static float weight(const T &e) { return e.weight; }
 	};
 
-
 	template <typename E, typename T = edge_traits<E>>
 	std::vector<E> minSpanForest(std::vector<E> edges) {
-
 		using namespace std;
 
 		// priority queue of edges
 		auto comp = [](E &a, E &b) { return T::weight(a) < T::weight(b); };
-		std::priority_queue<E, std::vector<E>, decltype(comp)> remaining_edges(comp);
+		priority_queue<E, vector<E>, decltype(comp)> remaining_edges(comp);
 		int max_id = 0;
 		for (E e : edges) {
 			remaining_edges.push(e);
@@ -70,7 +68,7 @@ namespace kruskal {
 
 		// create the unionfind and return vector
 		UnionFind uf_set(max_id + 1); // max_id+1 for index offset
-		std::vector<E> minimum_forest;
+		vector<E> minimum_forest;
 
 		// perform kruskals
 		while (!remaining_edges.empty()) {
@@ -83,9 +81,6 @@ namespace kruskal {
 			}
 		}
 
-
 		return minimum_forest;
 	}
-
-
 }

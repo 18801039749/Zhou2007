@@ -1,73 +1,89 @@
 #pragma once
 
-
 // std
 #include <vector>
+#include <queue>
 
 // opencv
 #include <opencv2/core.hpp>
 
-
 // project
 #include "ppa.hpp"
-
+#include "featurepatch.hpp"
 
 namespace zhou {
 
-	struct fpatch {
-		std::vector<cv::Vec2f> control_points; // outgoing points relative to center of patch
+	struct synthesisparams {
+		bool ridges = false;
+		bool valleys = false;
+		int patchsize = 80;
+		int k_set = 3;
+
+		// TODO weights
+
 	};
 
+	struct fpatch_candidate{
+		fpatch fp;
+		float weight;
+		// TODO other precomputed stuff
+		// like the heightmap calculated on the fly
+	};
 
-
-	// helper method that returns the first point a path crosses the circle
-	inline cv::Vec2f crossCircle(cv::Vec2f center, float radius, std::vector<cv::Vec2f> path) {
-		using namespace cv;
-		using namespace std;
-		assert(!path.empty());
-
-		
-	}
-
-
-	inline std::vector<fpatch> extractFPatches(const FeatureGraph &features, int patch_size) {
+	inline cv::Mat synthesize(const cv::Mat examplemap, const cv::Mat sketchmap, synthesisparams params) {
 		using namespace cv;
 		using namespace std;
 
-		int circle_radius = patch_size / 2;
+		assert(examplemap.type() == CV_32FC1);
+		assert(sketchmap.type() == CV_32FC1);
 
-		
-		// end-features and branch features
-		for (const auto &nodeitem : features.nodes()) {
-			Vec2f p = nodeitem.second.p;
-			std::vector<Vec2f> control_points;
-			for (int edgeid : nodeitem.second.edges) {
-				const FeatureEdge &edge = features.edges().at(edgeid);
-				std::vector<Vec2f> path = edge.path;
-				if (edge.node_start != nodeitem.first) reverse(path.begin(), path.end());
-				control_points.push_back(crossCircle(p, circle_radius, path));
-			}
-			// todo something with the control points
-		}
+		Mat synthesized(sketchmap.rows, sketchmap.cols, CV_8UC1, Scalar(0));
+		Mat synthesis(sketchmap.rows, sketchmap.cols, CV_32FC1, Scalar(0));
 
-		// path-features
-		for (const auto &edgeitem : features.edges()) {
-			Vec2f last = edgeitem.second.path[0];
-			float distance = 0;
-			for (int i = 1; edgeitem.second.path.size(); ++i) {
-				Vec2f next = edgeitem.second.path[i];
-				distance += norm(last, next);
-				if (distance > circle_radius) {
-					distance -= circle_radius;
+		// for ridge and valley seperately
+		{
+			// 1) Identify features
+			//
+			ppa::FeatureGraph examplefeature(examplemap);
+			ppa::FeatureGraph sketchfeature(sketchmap);
 
+			// 2) Extract feature patches
+			//
+			vector<fpatch> featurepatches = extractFeaturePatches(examplefeature, params.patchsize);
+
+			// 3) Place feature patches
+			//
+			for (fpatch fp : extractFeaturePatches(sketchmap, params.patchsize)) {
+				// calculate primary costs for relevant patches
+				priority_queue<fpatch_candidate> candidates;
+				for (fpatch candidate : featurepatches) {
+					// TODO calculate fpatch_candidate
 				}
 
-				last = next;
-			}
+				// calculate secondary costs for best k-set 
+				fpatch_candidate best;
+				for (int i = 0; i < 5 && !candidates.empty(); ++i) {
+					fpatch_candidate current = candidates.top;
+					candidates.pop();
 
+					// TODO calculate graphcut cost?
+					if (current.weight < best.weight)
+						best = current;
+				}
+
+				// place "best" patch
+				// TODO place "best" patch 
+			}
 		}
 
-	}
 
+		// 4) Extract and place non-feature patches
+		//
+
+		// ??? how is this even done ???
+
+
+		return synthesis;
+	}
 
 }

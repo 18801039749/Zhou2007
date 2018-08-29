@@ -10,6 +10,7 @@ SET(sources
 	"ppa.hpp"
 	"kruskal.hpp"
 
+	"featurepatch.hpp"
 	"zhou.hpp"
 
 	"main.cpp"
