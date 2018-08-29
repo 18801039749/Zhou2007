@@ -4,11 +4,14 @@
 #########################################################
 
 SET(sources
+	"eigen.hpp"
+	
 	"thin_plate.hpp"
 	"ppa.hpp"
 	"kruskal.hpp"
 
-	"eigen.hpp"
+	"zhou.hpp"
+
 	"main.cpp"
 	"CMakeLists.txt"
 )

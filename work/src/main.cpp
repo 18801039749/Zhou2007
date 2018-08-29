@@ -9,6 +9,7 @@
 
 // project
 #include "thin_plate.hpp"
+#include "ppa.hpp"
 
 
 using namespace cv;
@@ -64,14 +65,43 @@ void testThinplate() {
 
 
 
+void testPPA() {
+
+	Mat image = imread("work/res/mount_jackson.png", CV_LOAD_IMAGE_GRAYSCALE);
+	Mat heightmap;
+	image.convertTo(heightmap, CV_32FC1);
 
 
+	FeatureGraph fg1(heightmap, 7, FeatureGraph::VALLEY_FEATURES);
+	FeatureGraph fg2(heightmap, 7, FeatureGraph::VALLEY_FEATURES);
+}
+
+
+//void zhou2007() {
+//
+//	Mat examplemap, sketchmap;
+//	Mat image = imread("work/res/mount_jackson.png", CV_LOAD_IMAGE_GRAYSCALE);
+//	image.convertTo(examplemap, CV_32FC1);
+//	image = imread("work/res/mount_jackson.png", CV_LOAD_IMAGE_GRAYSCALE);
+//	image.convertTo(sketchmap, CV_32FC1);
+//
+//
+//	FeatureGraph fg1(heightmap, 7, FeatureGraph::VALLEY_FEATURES);
+//	
+//
+//
+//
+//}
 
 
 
 // main program
 // 
 int main( int argc, char** argv ) {
+
+
+
+
 
 
 
