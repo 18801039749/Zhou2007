@@ -33,6 +33,7 @@ namespace ppa {
 		FeatureEdge() {}
 		FeatureEdge(int id_, int ns, int ne, std::vector<cv::Vec2f> path_ = {})
 			: id(id_), node_start(ns), node_end(ne), path(path_) { }
+		int other(int n) const{ return (id == node_start) ? node_end : node_start; }
 	};
 
 	class FeatureGraph {
@@ -56,15 +57,20 @@ namespace ppa {
 
 		int feature_type;
 
-		FeatureGraph(const cv::Mat input, int profile_length = 7, int feature_type_ = RIDGE_FEATURES) : feature_type(feature_type_) {
+		FeatureGraph(const cv::Mat input, int grid_spacing = 10, int profile_length = 7, int feature_type_ = RIDGE_FEATURES) : feature_type(feature_type_) {
+			assert(!input.empty());
+			assert(input.type() == CV_32FC1);
+			assert(grid_spacing >= 1);
+			assert(profile_length >= 3);
+			assert(std::abs(feature_type_) == 1);
+
 			using namespace cv;
 			using namespace std;
 
-			const int downsample_value = 10;
-
 			// reduce down to operational grid
 			Mat grid;
-			resize(input, grid, input.size() / downsample_value, 0, 0, INTER_NEAREST);
+			resize(input, grid, input.size() / grid_spacing, 0, 0, INTER_NEAREST);
+			grid *= feature_type;
 
 			// inside region
 			Rect grid_rect(Point(0, 0), grid.size());
@@ -111,14 +117,14 @@ namespace ppa {
 						bool profile0 = false, profile1 = false;
 						for (int l = 1; l <= profile_length / 2; l++) {
 							Point delta = n * l;
-							profile0 |= grid_rect.contains(p + delta) && (e - grid.at<float>(p + delta)) * feature_type > thresh;
-							profile1 |= grid_rect.contains(p - delta) && (e - grid.at<float>(p - delta)) * feature_type > thresh;
+							profile0 |= grid_rect.contains(p + delta) && e - grid.at<float>(p + delta) > thresh;
+							profile1 |= grid_rect.contains(p - delta) && e - grid.at<float>(p - delta) > thresh;
 						}
 
 						if (profile0 && profile1) {
 							nodeids.at<int>(p) = nodeidcounter++;
 
-							circle(debug_nodeids, p * downsample_value, 2, Scalar(0, 0, 255)); // debug
+							circle(debug_nodeids, p * grid_spacing, 2, Scalar(0, 0, 255)); // debug
 
 							break;
 						}
@@ -141,9 +147,9 @@ namespace ppa {
 						if (grid_rect.contains(q) && nodeids.at<int>(q) >= 0) {
 							float qe = grid.at<float>(q);
 							// create an edge
-							tempedges.push_back(edge{ feature_type * (pe + qe) / 2, pid, nodeids.at<int>(q), p, q });
+							tempedges.push_back(edge{ pe + qe, pid, nodeids.at<int>(q), p, q });
 
-							line(debug_edges, p * downsample_value, q * downsample_value, Scalar(0, 0, 255)); // debug
+							line(debug_edges, p * grid_spacing, q * grid_spacing, Scalar(0, 0, 255)); // debug
 						}
 					}
 				}
@@ -155,7 +161,7 @@ namespace ppa {
 			tempedges = kruskal::minSpanForest(tempedges);
 
 			for (const edge &e : tempedges) // debug
-				line(debug_brokenedges, e.p1 * downsample_value, e.p2 * downsample_value, Scalar(0, 0, 255)); // debug
+				line(debug_brokenedges, e.p1 * grid_spacing, e.p2 * grid_spacing, Scalar(0, 0, 255)); // debug
 
 
 			// reduce graph
@@ -175,7 +181,7 @@ namespace ppa {
 			}
 
 			for (const edge &e : tempedges) // debug
-				line(debug_reduceedges, e.p1 * downsample_value, e.p2 * downsample_value, Scalar(0, 0, 255)); // debug
+				line(debug_reduceedges, e.p1 * grid_spacing, e.p2 * grid_spacing, Scalar(0, 0, 255)); // debug
 
 
 			// smooth positions
@@ -193,18 +199,16 @@ namespace ppa {
 			for (auto &nodep : nodetoposition) {
 				Point p = nodep.second;
 				float w = grid.at<float>(p);
-				if (feature_type == VALLEY_FEATURES) w = mmax - w;
 				// the 1.01 here is to weight the original value slightly
 				// so that neighbouring degree=1 points don't overlap (hack)
 				float weight = 1.01 * w;
-				Vec2f position = 1.01 * w * Vec2f(p.x, p.y) * downsample_value;
+				Vec2f position = weight * Vec2f(p.x, p.y) * grid_spacing;
 
 				for (auto e : nodetoedge.at(nodep.first)) {
 					p = nodetoposition.at(e.other(nodep.first));
 					w = grid.at<float>(p);
-					if (feature_type == VALLEY_FEATURES) w = mmax - w;
 					weight += w;
-					position += w * Vec2f(p.x, p.y) * downsample_value;
+					position += w * Vec2f(p.x, p.y) * grid_spacing;
 				}
 
 				smoothPosition[nodep.first] = position / weight;
@@ -287,12 +291,12 @@ namespace ppa {
 
 
 			//debug
-			//imwrite("output/nodeids.png", debug_nodeids);
-			//imwrite("output/edges.png", debug_edges);
-			//imwrite("output/brokenedges.png", debug_brokenedges);
-			//imwrite("output/reduceedges.png", debug_reduceedges); 
-			//imwrite("output/smoothedges.png", debug_smoothedges);
-			//imwrite("output/ppa.png", debug_ppa);
+			imwrite("output/nodeids.png", debug_nodeids);
+			imwrite("output/edges.png", debug_edges);
+			imwrite("output/brokenedges.png", debug_brokenedges);
+			imwrite("output/reduceedges.png", debug_reduceedges); 
+			imwrite("output/smoothedges.png", debug_smoothedges);
+			imwrite("output/ppa.png", debug_ppa);
 
 		}
 

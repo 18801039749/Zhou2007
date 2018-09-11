@@ -73,8 +73,9 @@ void testPPA() {
 	image.convertTo(heightmap, CV_32FC1);
 
 
-	ppa::FeatureGraph fg1(heightmap, 7, ppa::RIDGE_FEATURES);
-	ppa::FeatureGraph fg2(heightmap, 7, ppa::VALLEY_FEATURES);
+	ppa::FeatureGraph fg1(heightmap, 20, 7, ppa::RIDGE_FEATURES);
+	ppa::FeatureGraph fg2(heightmap, 20, 7, ppa::VALLEY_FEATURES);
+
 }
 
 
@@ -86,7 +87,7 @@ void testFeaturePatches() {
 	image.convertTo(heightmap, CV_32FC1);
 	cvtColor(image, cimage, COLOR_GRAY2BGR);
 
-	ppa::FeatureGraph fg(heightmap, 7, ppa::RIDGE_FEATURES);
+	ppa::FeatureGraph fg(heightmap, 10, 7, ppa::RIDGE_FEATURES);
 
 	// debug
 	for (const auto &n : fg.nodes()) {
@@ -96,7 +97,7 @@ void testFeaturePatches() {
 		Point p = e.second.path[0];
 		for (int i = 1; i < e.second.path.size(); i++) {
 			Point next = e.second.path[i];
-			line(cimage, p, next, Scalar(0, 255, 0));
+			line(cimage, p, next, Scalar(0, 255, 0), 2);
 			p = next;
 		}
 	}
@@ -117,8 +118,9 @@ void testFeaturePatches() {
 
 		rectangle(heightmapborder, roi, Scalar(0, 255, 0));
 		for (auto cp : p.controlpoints) {
-			line(heightmapborder, Point(p.center) + ps, Point(cp) + ps, Scalar(255, 0, 0), 2);
-			line(heightmappatch, Point(p.center) - roi.tl() + ps, Point(cp) - roi.tl() + ps, Scalar(255, 0, 0), 2);
+			line(heightmapborder, Point(p.center) + ps, Point(cp) + ps, Scalar(255, 0, 0), 1);
+			circle(heightmappatch, Point(p.center) - roi.tl() + ps, patch_size / 2, Scalar(255, 0, 0), 1);
+			line(heightmappatch, Point(p.center) - roi.tl() + ps, Point(cp) - roi.tl() + ps, Scalar(255, 0, 0), 1);
 		}
 
 		ostringstream oss;
@@ -137,7 +139,7 @@ int main( int argc, char** argv ) {
 
 	//testThinplate();
 	//testPPA();
-	//testFeaturePatches();
+	testFeaturePatches();
 
 	// wait for a keystroke in the window before exiting
 	waitKey(0);
