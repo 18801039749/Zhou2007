@@ -33,7 +33,7 @@ namespace ppa {
 		FeatureEdge() {}
 		FeatureEdge(int id_, int ns, int ne, std::vector<cv::Vec2f> path_ = {})
 			: id(id_), node_start(ns), node_end(ne), path(path_) { }
-		int other(int n) const{ return (id == node_start) ? node_end : node_start; }
+		int other(int n) const{ return (n == node_start) ? node_end : node_start; }
 	};
 
 	class FeatureGraph {
@@ -225,7 +225,7 @@ namespace ppa {
 				int pid = nte.first;
 				if (nte.second.size() == 1 && visited.find(pid) == visited.end()) {
 
-					// perform breadth first traversal from this node
+					// perform depth first traversal from this node
 					vector<int> toProcess;
 					toProcess.push_back(pid);
 					visited.insert(pid);

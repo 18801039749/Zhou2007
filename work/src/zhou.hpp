@@ -9,6 +9,7 @@
 
 // project
 #include "ppa.hpp"
+#include "thin_plate.hpp"
 #include "featurepatch.hpp"
 
 namespace zhou {
@@ -26,9 +27,80 @@ namespace zhou {
 	struct fpatch_candidate{
 		fpatch fp;
 		float weight;
+		cv::Mat patch;
+		cv::Mat graphcut;
 		// TODO other precomputed stuff
-		// like the heightmap calculated on the fly
+		// and some measure
 	};
+
+
+
+
+	fpatch_candidate createCandidate(const cv::Mat examplemap, const cv::Mat synthesis, const cv::Mat synthesized, fpatch candidate, fpatch target, synthesisparams params) {
+		// TODO asserts
+
+		using namespace cv;
+		using namespace std;
+
+		int hs1 = params.patchsize / 2;
+		int hs2 = params.patchsize - hs1;
+
+		float cost = 0;
+
+		// sample patch
+		//
+		Mat samplepatch(params.patchsize, params.patchsize, examplemap.type());
+		Mat samplecoord(params.patchsize, params.patchsize, CV_32FC2);
+		// if the degree doesn't match, just copy the patch directly
+		if (target.controlpoints.size() != target.controlpoints.size()) {
+			for (int i = 0; i < params.patchsize; ++i) {
+				for (int j = 0; j < params.patchsize; ++j) {
+					Vec2f p = Vec2f(j, i) - Vec2f(hs1, hs1) + candidate.center;
+					samplecoord.at<Vec2f>(i, j) = p;
+				}
+			}
+		}
+		// if the degree is 1, use rotation
+		else if (candidate.controlpoints.size() == 1) {
+			//TODO calculate an affine transform (Rotation + translation) from target to center
+			for (int i = 0; i < params.patchsize; ++i) {
+				for (int j = 0; j < params.patchsize; ++j) {
+					Vec2f p = Vec2f(j, i) - Vec2f(hs1, hs1) + candidate.center;
+					samplecoord.at<Vec2f>(i, j) = p;
+				}
+			}
+		}
+		// otherwise, use thin-plate splines
+		else {
+			thinplate2d<float> spline;
+			spline.addPoint(target.center, candidate.center);
+			for (int n = 0; n < target.controlpoints.size(); ++n) {
+				spline.addPoint(target.controlpoints[n], candidate.controlpoints[n]);
+			}
+			for (int i = 0; i < params.patchsize; ++i) {
+				for (int j = 0; j < params.patchsize; ++j) {
+					Vec2f p = Vec2f(j, i) - Vec2f(hs1, hs1) + target.center;
+					samplecoord.at<Vec2f>(i, j) = spline.evaluate(p);
+				}
+			}
+			// TODO add TPS value
+		}
+		//resample
+		remap(examplemap, samplepatch, samplecoord, Mat(), INTER_LINEAR, BORDER_REPLICATE);
+
+
+		// graph cut
+		//
+
+
+
+		//
+		//
+
+	}
+
+
+
 
 	inline cv::Mat synthesize(const cv::Mat examplemap, const cv::Mat sketchmap, synthesisparams params) {
 		using namespace cv;
