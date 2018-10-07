@@ -109,8 +109,8 @@ namespace zhou {
 		assert(examplemap.type() == CV_32FC1);
 		assert(sketchmap.type() == CV_32FC1);
 
-		Mat synthesized(sketchmap.rows, sketchmap.cols, CV_8UC1, Scalar(0));
-		Mat synthesis(sketchmap.rows, sketchmap.cols, CV_32FC1, Scalar(0));
+		// unsynthesized regions are marked with NaN
+		Mat synthesis(sketchmap.rows, sketchmap.cols, CV_32FC1, Scalar(numeric_limits<float>::quiet_NaN()));
 
 		// for ridge and valley seperately
 		{
@@ -128,23 +128,17 @@ namespace zhou {
 			for (fpatch fp : extractFeaturePatches(sketchmap, params.patchsize)) {
 				// calculate primary costs for relevant patches
 				priority_queue<fpatch_candidate> candidates;
+				fpatch_candidate best;
 				for (fpatch candidate : featurepatches) {
 					// TODO calculate fpatch_candidate
+					fpatch_candidate cand;
+					if (cand.weight < best.weight) {
+						best = cand;
+					}
 				}
 
-				// calculate secondary costs for best k-set 
-				fpatch_candidate best;
-				for (int i = 0; i < 5 && !candidates.empty(); ++i) {
-					fpatch_candidate current = candidates.top;
-					candidates.pop();
-
-					// TODO calculate graphcut cost?
-					if (current.weight < best.weight)
-						best = current;
-				}
-
-				// place "best" patch
 				// TODO place "best" patch 
+
 			}
 		}
 

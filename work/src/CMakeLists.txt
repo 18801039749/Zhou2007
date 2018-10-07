@@ -9,8 +9,10 @@ SET(sources
 	"thin_plate.hpp"
 	"ppa.hpp"
 	"kruskal.hpp"
+	"graphcut.hpp"
 
 	"featurepatch.hpp"
+	"patchmerge.hpp"
 	"zhou.hpp"
 
 	"main.cpp"

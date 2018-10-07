@@ -11,6 +11,8 @@
 #include "thin_plate.hpp"
 #include "ppa.hpp"
 #include "featurepatch.hpp"
+#include "graphcut.hpp"
+#include "patchmerge.hpp"
 
 
 using namespace cv;
@@ -133,13 +135,67 @@ void testFeaturePatches() {
 
 
 
+void testGraphCut() {
+	Mat image = imread("work/res/brick.jpg", CV_LOAD_IMAGE_GRAYSCALE);
+	Mat fimage;
+	image.convertTo(fimage, CV_32FC1);
+
+	fimage(Range(0, image.rows), Range(image.cols / 2, image.cols)).setTo(numeric_limits<float>::quiet_NaN());
+	Mat patch = fimage(Range(0, 64), Range(0, 64)).clone();
+
+	Vec2i pos(image.cols / 2 - patch.cols / 2, image.rows / 2 - patch.rows / 2);
+	float cost;
+	Mat cut = zhou::graphcut(fimage, patch, pos, &cost);
+	Mat cutpatch = patch.clone();
+
+	for (int i = 0; i < patch.rows; i++) {
+		for (int j = 0; j < patch.cols; j++) {
+			if (cut.at<bool>(i, j)) {
+				fimage.at<float>(i + pos[1], j + pos[0]) = patch.at<float>(i, j);
+			}
+			else {
+				cutpatch.at<float>(i, j) = 0;
+			}
+		}
+
+	}
+
+	cout << "cost : " << cost << endl;
+	imwrite("output/synthesis.png", fimage);
+	imwrite("output/patch.png", patch);
+	imwrite("output/cut.png", cutpatch);
+}
+
+
+void testSeamRemoval() {
+	Mat image = imread("work/res/brick.jpg", CV_LOAD_IMAGE_GRAYSCALE);
+	Mat fimage;
+	image.convertTo(fimage, CV_32FC1);
+
+	fimage(Range(0, image.rows), Range(image.cols / 2, image.cols)).setTo(numeric_limits<float>::quiet_NaN());
+	Mat patch = fimage(Range(0, 64), Range(0, 64)).clone();
+
+	Vec2i pos(image.cols / 2 - patch.cols / 2, image.rows / 2 - patch.rows / 2);
+	Mat cut = zhou::graphcut(fimage, patch, pos);
+
+	zhou::placePatch(fimage, patch, cut, pos);
+
+
+	imwrite("output/synthesis.png", fimage);
+	imwrite("output/patch.png", patch);
+}
+
+
+
 // main program
 // 
 int main( int argc, char** argv ) {
 
 	//testThinplate();
 	//testPPA();
-	testFeaturePatches();
+	//testFeaturePatches();
+	//testGraphCut();
+	testSeamRemoval();
 
 	// wait for a keystroke in the window before exiting
 	waitKey(0);
