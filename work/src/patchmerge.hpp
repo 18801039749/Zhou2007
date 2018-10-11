@@ -19,6 +19,7 @@ namespace zhou {
 
 	// Given the heightmap, mask and mask offset
 	// modify the heightmap to seamlessly fit in with surroundings
+	// TODO reform to only use values inside the mask?
 	void poissonSeamRemoval(cv::Mat synthesis, cv::Mat mask, cv::Mat seam_mask) {
 		using namespace cv;
 		using namespace std;
@@ -58,7 +59,7 @@ namespace zhou {
 		b_list.reserve(1024);
 
 
-		cout << "Initializing" << endl;
+		//cout << "Initializing" << endl;
 
 		// construct matrix
 		int row = 0;
@@ -70,80 +71,72 @@ namespace zhou {
 				// ignore nan values
 				if (isnan(pvalue)) continue;
 
-				// if masked, calculate derivatives
-				if (mask.at<uchar>(p)) {
-
-					// dx
-					float dx = 0;
-					int dx_count = 0;
-					Point q = p + Point(1, 0);
-					if (bound.contains(q) && mask.at<bool>(q)) {
-						triplet_list.emplace_back(row, getid(q), 1);
-						dx += synthesis.at<float>(q);
-						dx_count++;
-					}
-
-					q = p + Point(-1, 0);
-					if (bound.contains(q) && mask.at<bool>(q)) {
-						triplet_list.emplace_back(row, getid(q), 1);
-						dx += synthesis.at<float>(q);
-						dx_count++;
-					}
-
-					if (dx_count > 0) {
-						dx -= dx_count * pvalue;
-						triplet_list.emplace_back(row, getid(p), dx_count);
-						if (seam_mask.at<bool>(p)) dx = 0;
-						b_list.push_back(dx);
-						row++;
-					}
-
-					// dy
-					float dy = 0;
-					int dy_count = 0;
-					q = p + Point(0, 1);
-					if (bound.contains(q) && mask.at<bool>(q)) {
-						triplet_list.emplace_back(row, getid(q), 1);
-						dy += synthesis.at<float>(q);
-						dy_count++;
-					}
-
-					q = p + Point(0, -1);
-					if (bound.contains(q) && mask.at<bool>(q)) {
-						triplet_list.emplace_back(row, getid(q), 1);
-						dy += synthesis.at<float>(q);
-						dy_count++;
-					}
-
-					if (dy_count > 0) {
-						triplet_list.emplace_back(row, getid(p), dy_count);
-						dy -= dy_count * pvalue;
-						if (seam_mask.at<bool>(p)) dy = 0;
-						b_list.push_back(dy);
-						row++;
-					}
-				}
+				Point right_q = p + Point(1, 0);
+				Point bottom_q = p + Point(0, 1);
+				bool right = bound.contains(right_q) && !isnan(synthesis.at<float>(right_q));
+				bool bottom = bound.contains(bottom_q) && !isnan(synthesis.at<float>(bottom_q));
 
 				// if not masked, check if it is the boundary of masked pixels
-				else {
+				if (!mask.at<bool>(p)) {
 					// for all neighbours
 					for (int d = 0; d < 4; d++) {
 						Point q = p + delta[d];
 						if (bound.contains(q) && mask.at<bool>(q)) {
 							// put in sparse matrix as boundary condition
-							int id = getid(p);
-							triplet_list.emplace_back(row, id, 1);
+							triplet_list.emplace_back(row, getid(p), 1);
 							b_list.push_back(pvalue);
 							row++;
 							break;
 						}
 					}
 				}
+
+				// dx
+				if (right) {
+					// if p and q are a combination of no-mask and seam, use zero gradient
+					if (
+						(!mask.at<bool>(p) && seam_mask.at<bool>(right_q)) ||
+						(seam_mask.at<bool>(p) && !mask.at<bool>(right_q))
+					) {
+						triplet_list.emplace_back(row, getid(right_q), 1);
+						triplet_list.emplace_back(row, getid(p), -1);
+						b_list.push_back(0);
+						row++;
+					}
+					// else if one of them is masked, use a gradient
+					else if (mask.at<bool>(p) || mask.at<bool>(right_q)) {
+						triplet_list.emplace_back(row, getid(right_q), 1);
+						triplet_list.emplace_back(row, getid(p), -1);
+						b_list.push_back(synthesis.at<float>(right_q) - pvalue);
+						row++;
+					}
+				}
+
+				// dy
+				if (bottom) {
+					// if p and q are a combination of no-mask and seam, use zero gradient
+					if (
+						(!mask.at<bool>(p) && seam_mask.at<bool>(bottom_q)) ||
+						(seam_mask.at<bool>(p) && !mask.at<bool>(bottom_q))
+					) {
+						triplet_list.emplace_back(row, getid(bottom_q), 1);
+						triplet_list.emplace_back(row, getid(p), -1);
+						b_list.push_back(0);
+						row++;
+					}
+					// else if one of them is masked, use a gradient
+					else if (mask.at<bool>(p) || mask.at<bool>(bottom_q)) {
+						triplet_list.emplace_back(row, getid(bottom_q), 1);
+						triplet_list.emplace_back(row, getid(p), -1);
+						b_list.push_back(synthesis.at<float>(bottom_q) - pvalue);
+						row++;
+					}
+				}
 			}
 		}
 
 
-		cout << "Building" << endl;
+		//cout << "Building" << endl;
 
 		// Build the sparse matrix (nxn)
 		Eigen::SparseMatrix<float> A(row, idToPoint.size());
@@ -152,7 +145,7 @@ namespace zhou {
 
 		A.setFromTriplets(triplet_list.begin(), triplet_list.end());
 
-		cout << "Compressing" << endl;
+		//cout << "Compressing" << endl;
 
 		A.makeCompressed();
 
@@ -171,15 +164,17 @@ namespace zhou {
 		// cout << "Computing" << endl;
 		solver.compute(A);
 
-		cout << "Solving " << endl;
+		//cout << "Solving " << endl;
 		x = solver.solve(b);
-		cout << "Finished" << endl;
+		//cout << "Finished" << endl;
 
 
 		// apply the results to the synthesis
 		for (int i = 0; i < idToPoint.size(); ++i) {
 			Point p = idToPoint.at(i);
-			synthesis.at<float>(p) = x(i);
+			//if (mask.at<bool>(p)) {
+				synthesis.at<float>(p) = x(i);
+			//}
 		}
 	}
 
@@ -206,7 +201,7 @@ namespace zhou {
 			for (int j = 0; j < mask.cols; j++) {
 				Point p(j + pos[0], i + pos[1]);
 				// copy mask
-				if (bound.contains(p) && mask.at<bool>(i, j)) {
+				if (bound.contains(p) && !isnan(synthesis.at<float>(p)) && mask.at<bool>(i, j)) {
 					synthesis_mask.at<bool>(p) = true;
 				}
 			}

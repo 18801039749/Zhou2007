@@ -11,6 +11,7 @@
 #include "ppa.hpp"
 #include "thin_plate.hpp"
 #include "featurepatch.hpp"
+#include "graphcut.hpp"
 
 namespace zhou {
 
@@ -36,7 +37,7 @@ namespace zhou {
 
 
 
-	fpatch_candidate createCandidate(const cv::Mat examplemap, const cv::Mat synthesis, const cv::Mat synthesized, fpatch candidate, fpatch target, synthesisparams params) {
+	fpatch_candidate createFeaturePatchCandidate(const cv::Mat examplemap, const cv::Mat synthesis, fpatch candidate, fpatch target, synthesisparams params) {
 		// TODO asserts
 
 		using namespace cv;
@@ -47,9 +48,11 @@ namespace zhou {
 
 		float cost = 0;
 
+		fpatch_candidate cand;
+
 		// sample patch
 		//
-		Mat samplepatch(params.patchsize, params.patchsize, examplemap.type());
+		//Mat samplepatch(params.patchsize, params.patchsize, examplemap.type());
 		Mat samplecoord(params.patchsize, params.patchsize, CV_32FC2);
 		// if the degree doesn't match, just copy the patch directly
 		if (target.controlpoints.size() != target.controlpoints.size()) {
@@ -83,20 +86,29 @@ namespace zhou {
 					samplecoord.at<Vec2f>(i, j) = spline.evaluate(p);
 				}
 			}
-			// TODO add TPS value
+			// TODO add TPS cost
+			cand.weight += spline.energy();
 		}
-		//resample
-		remap(examplemap, samplepatch, samplecoord, Mat(), INTER_LINEAR, BORDER_REPLICATE);
+
+		// create patch
+		//
+		remap(examplemap, cand.patch, samplecoord, Mat(), INTER_LINEAR, BORDER_REPLICATE);
+
+		// TODO
+		// cost of ridge profile SSD
+		//
+		cand.weight += 0;
 
 
 		// graph cut
 		//
-
-
+		float graphcut_cost;
+		cand.graphcut = zhou::graphcut(synthesis, cand.patch, Vec2i(target.center[0] - hs1, target.center[1] - hs1), &graphcut_cost);
+		cand.weight += graphcut_cost;
 
 		//
 		//
-
+		return cand;
 	}
 
 

@@ -173,7 +173,7 @@ void testSeamRemoval() {
 	image.convertTo(fimage, CV_32FC1);
 
 	fimage(Range(0, image.rows), Range(image.cols / 2, image.cols)).setTo(numeric_limits<float>::quiet_NaN());
-	Mat patch = fimage(Range(0, 64), Range(0, 64)).clone();
+	Mat patch = fimage(Range(0, 128), Range(0, 128)).clone();
 
 	Vec2i pos(image.cols / 2 - patch.cols / 2, image.rows / 2 - patch.rows / 2);
 	Mat cut = zhou::graphcut(fimage, patch, pos);
@@ -183,6 +183,26 @@ void testSeamRemoval() {
 
 	imwrite("output/synthesis.png", fimage);
 	imwrite("output/patch.png", patch);
+
+
+	//Mat image(2, 5, CV_32FC1, 1);
+	//Mat mask(2, 5, CV_8UC1, Scalar(false));
+	//Mat seam(2, 5, CV_8UC1, Scalar(false));
+	//for (int i = 0; i < image.rows; i++) {
+	//	for (int j = 0; j < image.cols; j++) {
+	//		image.at<float>(i, j) = j*10 + 10;
+	//		if (j >= 1 && j < 4) {
+	//			if (j == 1) {
+	//				seam.at<bool>(i, j) = true;
+	//			}
+	//			mask.at<bool>(i, j) = true;
+	//		}
+	//	}
+	//}
+
+	//cout << "before" << image << endl;
+	//zhou::poissonSeamRemoval(image, mask, seam);
+	//cout << "after" << image << endl;
 }
 
 
