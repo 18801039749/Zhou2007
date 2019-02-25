@@ -12,6 +12,7 @@
 #include "thin_plate.hpp"
 #include "featurepatch.hpp"
 #include "graphcut.hpp"
+#include "patchmerge.hpp"
 
 namespace zhou {
 
@@ -19,9 +20,16 @@ namespace zhou {
 		bool ridges = false;
 		bool valleys = false;
 		int patchsize = 80;
-		int k_set = 3;
 
-		// TODO weights
+		// feature patch
+		float tps_weight = 1;
+		float feature_weight = 1;
+		float fgraphcut_weight = 1;
+
+		// non-feature patch
+		int k_set = 3;
+		float overlap_weight = 1;
+		float nfgraphcut_weight = 1;
 
 	};
 
@@ -52,7 +60,6 @@ namespace zhou {
 
 		// sample patch
 		//
-		//Mat samplepatch(params.patchsize, params.patchsize, examplemap.type());
 		Mat samplecoord(params.patchsize, params.patchsize, CV_32FC2);
 		// if the degree doesn't match, just copy the patch directly
 		if (target.controlpoints.size() != target.controlpoints.size()) {
@@ -65,10 +72,16 @@ namespace zhou {
 		}
 		// if the degree is 1, use rotation
 		else if (candidate.controlpoints.size() == 1) {
-			//TODO calculate an affine transform (Rotation + translation) from target to center
+			// rotate
+			float angle = atan2(candidate.controlpoints[0][1], candidate.controlpoints[0][0]);
+			float c = cos(angle);
+			float s = sin(angle);
+
 			for (int i = 0; i < params.patchsize; ++i) {
 				for (int j = 0; j < params.patchsize; ++j) {
-					Vec2f p = Vec2f(j, i) - Vec2f(hs1, hs1) + candidate.center;
+					Vec2f p = Vec2f(j, i) - Vec2f(hs1, hs1);
+					p = Vec2f(c * p[0] + s * p[1], c * p[0] - s * p[1]);
+					p += candidate.center;
 					samplecoord.at<Vec2f>(i, j) = p;
 				}
 			}
@@ -86,8 +99,7 @@ namespace zhou {
 					samplecoord.at<Vec2f>(i, j) = spline.evaluate(p);
 				}
 			}
-			// TODO add TPS cost
-			cand.weight += spline.energy();
+			cand.weight += spline.energy() * params.tps_weight;
 		}
 
 		// create patch
@@ -142,15 +154,14 @@ namespace zhou {
 				priority_queue<fpatch_candidate> candidates;
 				fpatch_candidate best;
 				for (fpatch candidate : featurepatches) {
-					// TODO calculate fpatch_candidate
-					fpatch_candidate cand;
+					fpatch_candidate cand = createFeaturePatchCandidate(examplemap, synthesis, candidate, fp, params);
 					if (cand.weight < best.weight) {
 						best = cand;
 					}
 				}
 
-				// TODO place "best" patch 
-
+				// place patch
+				zhou::placePatch(synthesis, best.patch, best.graphcut, fp.center);
 			}
 		}
 

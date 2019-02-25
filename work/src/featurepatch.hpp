@@ -16,7 +16,7 @@ namespace zhou {
 
 	struct fpatch {
 		cv::Vec2f center; // center relative to the original data
-		std::vector<cv::Vec2f> controlpoints; // outgoing points relative to center of patch
+		std::vector<cv::Vec2f> controlpoints; // outgoing points relative to center of patch (does not contain the center)
 	};
 
 

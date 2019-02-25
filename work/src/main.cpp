@@ -215,7 +215,7 @@ int main( int argc, char** argv ) {
 	//testPPA();
 	//testFeaturePatches();
 	//testGraphCut();
-	testSeamRemoval();
+	//testSeamRemoval();
 
 	// wait for a keystroke in the window before exiting
 	waitKey(0);
