@@ -61,6 +61,10 @@ namespace zhou {
 
 		//cout << "Initializing" << endl;
 
+
+		// note to self:
+		// triplet_list.emplace_back(ROW, COL_ID, VALUE);
+
 		// construct matrix
 		int row = 0;
 		for (int i = 0; i < mask.rows; i++) {
@@ -71,14 +75,10 @@ namespace zhou {
 				// ignore nan values
 				if (isnan(pvalue)) continue;
 
-				Point right_q = p + Point(1, 0);
-				Point bottom_q = p + Point(0, 1);
-				bool right = bound.contains(right_q) && !isnan(synthesis.at<float>(right_q));
-				bool bottom = bound.contains(bottom_q) && !isnan(synthesis.at<float>(bottom_q));
 
-				// if not masked, check if it is the boundary of masked pixels
+				// if not masked, but one of the neighbours is masked
+				// then this is a dirichlet boundry condition
 				if (!mask.at<bool>(p)) {
-					// for all neighbours
 					for (int d = 0; d < 4; d++) {
 						Point q = p + delta[d];
 						if (bound.contains(q) && mask.at<bool>(q)) {
@@ -91,47 +91,36 @@ namespace zhou {
 					}
 				}
 
-				// dx
-				if (right) {
-					// if p and q are a combination of no-mask and seam, use zero gradient
-					if (
-						(!mask.at<bool>(p) && seam_mask.at<bool>(right_q)) ||
-						(seam_mask.at<bool>(p) && !mask.at<bool>(right_q))
-					) {
-						triplet_list.emplace_back(row, getid(right_q), 1);
-						triplet_list.emplace_back(row, getid(p), -1);
+				// calculate dx
+				// either p or left is a masked value
+				Point left = p + Point(-1, 0);
+				if (bound.contains(left) && !isnan(synthesis.at<float>(left)) && (mask.at<bool>(p) || mask.at<bool>(left))) {
+					triplet_list.emplace_back(row, getid(p), 1);
+					triplet_list.emplace_back(row, getid(left), -1);
+					if (seam_mask.at<bool>(p) && seam_mask.at<bool>(left)) {
 						b_list.push_back(0);
-						row++;
+					} else {
+						b_list.push_back(pvalue - synthesis.at<float>(left));
 					}
-					// else if one of them is masked, use a gradient
-					else if (mask.at<bool>(p) || mask.at<bool>(right_q)) {
-						triplet_list.emplace_back(row, getid(right_q), 1);
-						triplet_list.emplace_back(row, getid(p), -1);
-						b_list.push_back(synthesis.at<float>(right_q) - pvalue);
-						row++;
-					}
+					row++;
 				}
 
-				// dy
-				if (bottom) {
-					// if p and q are a combination of no-mask and seam, use zero gradient
-					if (
-						(!mask.at<bool>(p) && seam_mask.at<bool>(bottom_q)) ||
-						(seam_mask.at<bool>(p) && !mask.at<bool>(bottom_q))
-					) {
-						triplet_list.emplace_back(row, getid(bottom_q), 1);
-						triplet_list.emplace_back(row, getid(p), -1);
+
+				// calculate dy
+				// either p or top is a masked value
+				Point top = p + Point(0, -1);
+				if (bound.contains(top) && !isnan(synthesis.at<float>(top)) && (mask.at<bool>(p) || mask.at<bool>(top))) {
+					triplet_list.emplace_back(row, getid(p), 1);
+					triplet_list.emplace_back(row, getid(top), -1);
+					if (seam_mask.at<bool>(p) && seam_mask.at<bool>(top)) {
 						b_list.push_back(0);
-						row++;
 					}
-					// else if one of them is masked, use a gradient
-					else if (mask.at<bool>(p) || mask.at<bool>(bottom_q)) {
-						triplet_list.emplace_back(row, getid(bottom_q), 1);
-						triplet_list.emplace_back(row, getid(p), -1);
-						b_list.push_back(synthesis.at<float>(bottom_q) - pvalue);
-						row++;
+					else {
+						b_list.push_back(pvalue - synthesis.at<float>(top));
 					}
+					row++;
 				}
+
 			}
 		}
 
@@ -183,6 +172,7 @@ namespace zhou {
 
 	// place patch using the graphcut mask provided
 	// uses seam removal
+	// assumes patch is non null
 	void placePatch(cv::Mat synthesis, cv::Mat patch, cv::Mat mask, cv::Vec2i pos) {
 		using namespace std;
 		using namespace cv;
@@ -192,50 +182,54 @@ namespace zhou {
 		assert(patch.type() == CV_32FC1);
 		assert(mask.type() == CV_8UC1);
 
-		// create a mask and seam_mask the same size as synthesis
-		Mat synthesis_mask(synthesis.rows, synthesis.cols, CV_8UC1, Scalar(false));
 		Point delta[4] = { {1,0}, {0,1}, {-1,0}, {0,-1} };
-		Rect bound(Point(0, 0), synthesis.size());
-		Mat seam_mask = synthesis_mask.clone();
-		for (int i = 0; i < mask.rows; i++) {
-			for (int j = 0; j < mask.cols; j++) {
-				Point p(j + pos[0], i + pos[1]);
-				// copy mask
-				if (bound.contains(p) && !isnan(synthesis.at<float>(p)) && mask.at<bool>(i, j)) {
-					synthesis_mask.at<bool>(p) = true;
-				}
-			}
-		}
+		Rect patchBound(Point(0, 0), patch.size());
+		Rect synthesisBound(Point(0, 0), synthesis.size());
 
-		// create seam_mask
+		// create synthesis-sized overlap mask and seam mask
+		Mat synthesis_overlap(synthesis.rows, synthesis.cols, CV_8UC1, Scalar(false));
+		Mat seam_mask(synthesis.rows, synthesis.cols, CV_8UC1, Scalar(false));
 		for (int i = 0; i < mask.rows; i++) {
 			for (int j = 0; j < mask.cols; j++) {
 				Point p(j + pos[0], i + pos[1]);
-				if (bound.contains(p) && synthesis_mask.at<bool>(p)) {
-					// check if there's a seam
+				if (synthesisBound.contains(p)) {
+					// entire overlap area
+					if (!isnan(synthesis.at<float>(p))) {
+						synthesis_overlap.at<bool>(p) = true;
+					}
+
+					// mask value placement
+					if (mask.at<bool>(i, j)) {
+						synthesis.at<float>(p) = patch.at<float>(i, j);
+					}
+
+					// a seam is pixel in the overlap area and on the cut boundry
 					for (int d = 0; d < 4; d++) {
-						Point q = p + delta[d];
-						// if the neighbour 'q' is not masked, and is not nan, then 'p' is a seam
-						if (bound.contains(q) && !isnan(synthesis.at<float>(q)) && !synthesis_mask.at<bool>(q)) {
-							seam_mask.at<bool>(q) = true;
+						Point neighbour = Point(j, i) + delta[d];
+						if (patchBound.contains(neighbour) && mask.at<bool>(i, j) != mask.at<bool>(neighbour)) {
+							seam_mask.at<bool>(p) = true;
 						}
 					}
 				}
 			}
 		}
 
-		// place value into synthesis
-		for (int i = 0; i < mask.rows; i++) {
-			for (int j = 0; j < mask.cols; j++) {
-				Point p(j + pos[0], i + pos[1]);
-				if (bound.contains(p) && mask.at<bool>(i, j)) {
-					synthesis.at<float>(p) = patch.at<float>(i, j);
-				}
+		// remove the seam
+		poissonSeamRemoval(synthesis, synthesis_overlap, seam_mask);
+
+
+		// debug
+		Mat maskImage(synthesis.rows, synthesis.cols, CV_8UC3, Scalar(0));
+		for (int i = 0; i < maskImage.rows; i++) {
+			for (int j = 0; j < maskImage.cols; j++) {
+				if (synthesis_overlap.at<bool>(i, j))
+					maskImage.at<Vec3b>(i, j) = Vec3b(255, 255, 255);
+				if (seam_mask.at<bool>(i, j))
+					maskImage.at<Vec3b>(i, j) = Vec3b(0, 0, 255);
 			}
 		}
+		imwrite("output/maskiamge.png", maskImage);
 
-		// remove the seam
-		poissonSeamRemoval(synthesis, synthesis_mask, seam_mask);
 
 		// done
 	}

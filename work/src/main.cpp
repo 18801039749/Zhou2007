@@ -13,6 +13,7 @@
 #include "featurepatch.hpp"
 #include "graphcut.hpp"
 #include "patchmerge.hpp"
+#include "zhou.hpp"
 
 
 using namespace cv;
@@ -92,45 +93,29 @@ void testFeaturePatches() {
 	ppa::FeatureGraph fg(heightmap, 10, 7, ppa::RIDGE_FEATURES);
 
 	// debug
+	Mat fullimage = cimage.clone();
 	for (const auto &n : fg.nodes()) {
-		circle(cimage, Point(n.second.p), 3, Scalar(0, 0, 225));
+		circle(fullimage, Point(n.second.p), 3, Scalar(0, 0, 225));
 	}
 	for (const auto &e : fg.edges()) {
 		Point p = e.second.path[0];
 		for (int i = 1; i < e.second.path.size(); i++) {
 			Point next = e.second.path[i];
-			line(cimage, p, next, Scalar(0, 255, 0), 2);
+			line(fullimage, p, next, Scalar(0, 255, 0), 2);
 			p = next;
 		}
 	}
+	imwrite("output/patches.png", fullimage);
 
-	const int patch_size = 60;
-	Point ps(patch_size, patch_size);
-
-	auto patches = zhou::extractFeaturePatches(fg, patch_size);
-	Mat heightmapborder;
-	copyMakeBorder(cimage, heightmapborder, patch_size, patch_size, patch_size, patch_size, BORDER_CONSTANT);
-	Mat heightmapcopy = heightmapborder.clone();
-	Mat heightmappatch(patch_size, patch_size, heightmapborder.type());
 
 	int count = 0;
-	for (auto p : patches) {
-		Rect roi(Point(p.center + Vec2f(patch_size / 2, patch_size / 2)), Size(patch_size, patch_size));
-		heightmappatch = heightmapcopy(roi).clone();
-
-		rectangle(heightmapborder, roi, Scalar(0, 255, 0));
-		for (auto cp : p.controlpoints) {
-			line(heightmapborder, Point(p.center) + ps, Point(cp) + ps, Scalar(255, 0, 0), 1);
-			circle(heightmappatch, Point(p.center) - roi.tl() + ps, patch_size / 2, Scalar(255, 0, 0), 1);
-			line(heightmappatch, Point(p.center) - roi.tl() + ps, Point(cp) - roi.tl() + ps, Scalar(255, 0, 0), 1);
-		}
-
+	const int patch_size = 60;
+	auto patches = zhou::extractFeaturePatches(fg, patch_size);
+	for (auto fp : patches) {
 		ostringstream oss;
 		oss << "output/patch" << count++ << ".png";
-		imwrite(oss.str(), heightmappatch);
+		imwrite(oss.str(), zhou::fpatch2img(fp, patch_size, cimage));
 	}
-
-	imwrite("output/patches.png", heightmapborder);
 }
 
 
@@ -141,6 +126,7 @@ void testGraphCut() {
 	image.convertTo(fimage, CV_32FC1);
 
 	fimage(Range(0, image.rows), Range(image.cols / 2, image.cols)).setTo(numeric_limits<float>::quiet_NaN());
+	fimage(Range(image.rows / 2, image.rows), Range(0, image.cols)).setTo(numeric_limits<float>::quiet_NaN());
 	Mat patch = fimage(Range(0, 64), Range(0, 64)).clone();
 
 	Vec2i pos(image.cols / 2 - patch.cols / 2, image.rows / 2 - patch.rows / 2);
@@ -207,6 +193,43 @@ void testSeamRemoval() {
 
 
 
+void testSynthesis() {
+	Mat image1 = imread("work/res/mount_jackson.png", CV_LOAD_IMAGE_GRAYSCALE);
+	Mat image2 = imread("work/res/half_life.png", CV_LOAD_IMAGE_GRAYSCALE);
+	Mat heightmap, sketchmap;
+	image1.convertTo(heightmap, CV_32FC1);
+	image2.convertTo(sketchmap, CV_32FC1);
+
+	zhou::synthesisparams p;
+	Mat synthesis = zhou::synthesize(heightmap, sketchmap, p);
+
+	imwrite("output/synthesis.png", synthesis);
+}
+
+
+void testRotation() {
+
+	Vec2f point(11, 10);
+	Vec2f center(10, 10);
+	Vec2f outpath1 = center - point;
+	Vec2f outpath2(0, 1);
+	float sign = copysign(1, outpath2[0] * outpath1[1] - outpath2[1] * outpath1[0]);
+	float angle = sign * acos(outpath1.dot(outpath2));
+
+	float c = cos(angle);
+	float s = sin(angle);
+
+
+	Vec2f p = point - center;
+		
+	p = Vec2f(c * p[0] - s * p[1], s * p[0] + c * p[1]);
+	p += center;
+
+	cout << "p" << p << endl; // expect (10, 11)
+}
+
+
+
 // main program
 // 
 int main( int argc, char** argv ) {
@@ -214,8 +237,10 @@ int main( int argc, char** argv ) {
 	//testThinplate();
 	//testPPA();
 	//testFeaturePatches();
+	//testRotation();
 	//testGraphCut();
 	//testSeamRemoval();
+	testSynthesis();
 
 	// wait for a keystroke in the window before exiting
 	waitKey(0);

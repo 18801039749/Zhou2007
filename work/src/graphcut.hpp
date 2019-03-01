@@ -111,7 +111,7 @@ namespace zhou {
 			}
 		}
 
-		imwrite("output/ids.png", ids);
+		//imwrite("output/ids.png", ids);
 
 
 		// if there are no sources or no sinks we return the patch as is
@@ -143,8 +143,8 @@ namespace zhou {
 			}
 		}
 
-		imwrite("output/debug.png", debug);
-		imwrite("output/diff.png", diff);
+		//imwrite("output/debug.png", debug);
+		//imwrite("output/diff.png", diff);
 
 		return patch_cut;
 	}
@@ -157,17 +157,15 @@ namespace zhou {
 
 		assert(synthesis.type() == CV_32FC1);
 		assert(patch.type() == CV_32FC1);
-
-		Vec2i ps(patch.cols, patch.rows);
 		
 		Mat bsynthesis;
-		copyMakeBorder(synthesis, bsynthesis, ps[1], ps[1], ps[0], ps[0], BORDER_CONSTANT, numeric_limits<double>::quiet_NaN());
+		copyMakeBorder(synthesis, bsynthesis, patch.rows, patch.rows, patch.cols, patch.cols, BORDER_CONSTANT, numeric_limits<double>::quiet_NaN());
 
-		imwrite("output/isnan.png", bsynthesis);
+		//imwrite("output/isnan.png", bsynthesis);
 
-		int startcol = pos[0] + ps[0];
-		int startrow = pos[1] + ps[1];
-		Mat synthesis_patch = bsynthesis(Range(startrow, startrow + ps[1]), Range(startcol, startcol + ps[0]));
+		int startcol = pos[0] + patch.cols;
+		int startrow = pos[1] + patch.rows;
+		Mat synthesis_patch = bsynthesis(Range(startrow, startrow + patch.rows), Range(startcol, startcol + patch.cols));
 
 		return graphcut(synthesis_patch, patch, cost);
 	}

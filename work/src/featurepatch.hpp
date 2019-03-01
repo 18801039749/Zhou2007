@@ -16,7 +16,7 @@ namespace zhou {
 
 	struct fpatch {
 		cv::Vec2f center; // center relative to the original data
-		std::vector<cv::Vec2f> controlpoints; // outgoing points relative to center of patch (does not contain the center)
+		std::vector<cv::Vec2f> controlpoints; // outgoing points relative to the center (but does not contain the center)
 	};
 
 
@@ -105,7 +105,7 @@ namespace zhou {
 			// check outgoing edge for intersection
 			Vec2f intersection;
 			if (circlePathIntersection(center, radius, edge.path, (edge.node_start != current), false, intersection)) {
-				intersections.push_back(intersection);
+				intersections.push_back(intersection - center);
 			}
 
 			// otherwise recursively serch for intersections along the graph
@@ -186,9 +186,9 @@ namespace zhou {
 							vector<Vec2f> controlpoints;
 							Vec2f point;
 							circlePathIntersection(center, radius, previousPath, true, true, point);
-							controlpoints.push_back(point);
+							controlpoints.push_back(point - center);
 							circlePathIntersection(center, radius, nextPath, true, true, point);
-							controlpoints.push_back(point);
+							controlpoints.push_back(point - center);
 							featurepatches.push_back(fpatch{ center, controlpoints });
 						}
 						nextPath.pop_back();
@@ -201,5 +201,69 @@ namespace zhou {
 		}
 
 		return featurepatches;
+	}
+
+	
+	inline std::vector<cv::Mat> extractNonfeaturePatches(cv::Mat examplemap, std::vector<fpatch> featurePatches, int patch_size) {
+		assert(patch_size > 1);
+		assert(!examplemap.empty());
+		assert(examplemap.type() == CV_32FC1);
+
+		using namespace cv;
+		using namespace std;
+
+		int hp1 = patch_size / 2;
+		int hp2 = patch_size - hp1;
+
+		Mat mask(examplemap.rows, examplemap.cols, CV_8UC1, Scalar(false));
+		Rect bound(Point(0, 0), mask.size());
+		for (fpatch fp : featurePatches) {
+			for (int i = fp.center[1] - hp1; i < fp.center[1] + hp2; ++i) {
+				for (int j = fp.center[0] - hp1; j < fp.center[0] + hp2; ++j) {
+					if (bound.contains(Point(j, i))) {
+						mask.at<bool>(i, j) = true;
+					}
+				}
+			}
+		}
+
+		vector<Mat> nonfeaturePatches;
+		for (int i = 0; i < mask.rows - patch_size; i += patch_size / 2) {
+			for (int j = 0; j < mask.cols - patch_size; j += patch_size / 2) {
+				if (!mask.at<bool>(i + hp1, j + hp1)) {
+					nonfeaturePatches.push_back(examplemap(Range(i, i + patch_size), Range(j, j + patch_size)));
+				}
+			}
+		}
+
+		return nonfeaturePatches;
+	}
+
+
+	// source must be a BGR 8UC3
+	inline cv::Mat fpatch2img(const fpatch &fp, int patch_size, cv::Mat source) {
+		using namespace cv;
+
+		assert(!source.empty());
+		assert(source.type() == CV_8UC3);
+		
+		Rect roi(Point(fp.center - Vec2f(patch_size / 2, patch_size / 2)), Size(patch_size, patch_size));
+
+		Mat coords(patch_size, patch_size, CV_16SC2);
+		Mat patch;
+		for (int i = 0; i < roi.height; ++i) {
+			for (int j = 0; j < roi.width; ++j) {
+				coords.at<Vec2s>(i, j) = Vec2s(roi.x + j, roi.y + i);
+			}
+		}
+		remap(source, patch, coords, Mat(), INTER_NEAREST, BORDER_CONSTANT);
+
+		Point ps(patch_size, patch_size);
+		circle(patch, ps / 2, patch_size / 2 - 3, Scalar(255, 0, 0), 1, CV_AA);
+		for (auto cp : fp.controlpoints) {
+			line(patch, ps / 2, ps / 2 + Point(cp), Scalar(0, 0, 255), 1, CV_AA);
+		}
+
+		return patch;
 	}
 }

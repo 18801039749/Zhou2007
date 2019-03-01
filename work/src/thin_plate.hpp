@@ -30,7 +30,7 @@ namespace zhou {
 		cv::Vec<T, 3> m_a1;
 
 		// energy
-		T m_energy;
+		T m_energy = std::numeric_limits<float>::infinity();
 
 		// thin plate spline kernel : k(p,q) = d=distance(p,q), d^2 ln(d)
 		T thinPlateKernal(const VecT &p, const VecT &q) const {
