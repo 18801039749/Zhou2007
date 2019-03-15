@@ -262,6 +262,10 @@ namespace zhou {
 		circle(patch, ps / 2, patch_size / 2 - 3, Scalar(255, 0, 0), 1, CV_AA);
 		for (auto cp : fp.controlpoints) {
 			line(patch, ps / 2, ps / 2 + Point(cp), Scalar(0, 0, 255), 1, CV_AA);
+
+			Vec2f patchOutpath = Vec2f(patch_size, patch_size) / 2 + cp / 2;
+			Vec2f perpendicular = normalize(Vec2f(cp[1], -cp[0]));
+			line(patch, Point(patchOutpath + perpendicular * 3), Point(patchOutpath - perpendicular * 3), Scalar(0, 255, 0), 1, CV_AA);
 		}
 
 		return patch;

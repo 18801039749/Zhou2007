@@ -11,6 +11,7 @@
 #include "thin_plate.hpp"
 #include "ppa.hpp"
 #include "featurepatch.hpp"
+#include "terrain.hpp"
 #include "graphcut.hpp"
 #include "patchmerge.hpp"
 #include "zhou.hpp"
@@ -76,8 +77,8 @@ void testPPA() {
 	image.convertTo(heightmap, CV_32FC1);
 
 
-	ppa::FeatureGraph fg1(heightmap, 20, 7, ppa::RIDGE_FEATURES);
-	ppa::FeatureGraph fg2(heightmap, 20, 7, ppa::VALLEY_FEATURES);
+	ppa::FeatureGraph fg1(heightmap, 5, 7, ppa::RIDGE_FEATURES);
+	//ppa::FeatureGraph fg2(heightmap, 20, 7, ppa::VALLEY_FEATURES);
 
 }
 
@@ -194,16 +195,21 @@ void testSeamRemoval() {
 
 
 void testSynthesis() {
-	Mat image1 = imread("work/res/mount_jackson.png", CV_LOAD_IMAGE_GRAYSCALE);
-	Mat image2 = imread("work/res/half_life.png", CV_LOAD_IMAGE_GRAYSCALE);
-	Mat heightmap, sketchmap;
-	image1.convertTo(heightmap, CV_32FC1);
+	
+	//zhou::terrain test_terrain = zhou::terrainReadImage("work/res/mount_jackson.png", 0, 255, 1);
+	//zhou::terrain test_terrain = zhou::terrainReadTIFF("work/res/mt_fuji_n035e138.tif");
+	//zhou::terrain test_terrain = zhou::terrainReadTIFF("work/res/mount_jackson_n39_w107_3arc.tif");
+	zhou::terrain test_terrain = zhou::terrainReadTIFF("work/res/southern_alps_s045e169.tif");
+
+	Mat sketchmap, image2 = imread("work/res/fractal_terrain.png", CV_LOAD_IMAGE_GRAYSCALE);
 	image2.convertTo(sketchmap, CV_32FC1);
 
 	zhou::synthesisparams p;
-	Mat synthesis = zhou::synthesize(heightmap, sketchmap, p);
+	p.ppaGridSpacing = 30;
+	Mat synthesis = zhou::synthesize(test_terrain.heightmap, sketchmap, p);
 
-	imwrite("output/synthesis.png", synthesis);
+	imwrite("output/salps_synth.png", zhou::heightmapToImage(synthesis));
+	zhou::terrainWriteTxt("output/salps_synth.asc", zhou::terrain(synthesis, test_terrain.spacing));
 }
 
 

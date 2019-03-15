@@ -15,6 +15,9 @@ SET(sources
 	"patchmerge.hpp"
 	"zhou.hpp"
 
+	"terrain.hpp"
+	"terrain.cpp"
+
 	"main.cpp"
 	"CMakeLists.txt"
 )
@@ -33,3 +36,4 @@ target_source_group_tree(${CGRA_PROJECT})
 # Link usage requirements
 target_link_libraries(${CGRA_PROJECT} PRIVATE ${OpenCV_LIBS})
 target_link_libraries(${CGRA_PROJECT} PRIVATE maxflow eigen)
+target_link_libraries(${CGRA_PROJECT} PRIVATE tiff geotiff_library)

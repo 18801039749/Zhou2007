@@ -12,31 +12,40 @@
 #include "thin_plate.hpp"
 #include "featurepatch.hpp"
 #include "graphcut.hpp"
+#include "terrain.hpp"
 #include "patchmerge.hpp"
 
 namespace zhou {
 
 	struct synthesisparams {
-		bool ridges = false;
-		bool valleys = false;
-		
+
+		// main
 		int patchsize = 80;
-		int nonfeatureSpacing = 100;
+
+		//ppa
+		static enum {
+			PPA_RIDGE_FEATURES,
+			PPA_VALLEY_FEATURES,
+			PPA_RIDGE_AND_VALLEY_FEATURES
+		};
+		int ppaGridSpacing = 10;
+		int profile_length = 7;
+		int ppaFeatures = PPA_RIDGE_FEATURES;
 
 		// feature patch
 		float tpsWeight = 1000;
 		float featureGraphcutWeight = 1;
-		float featureProfileWeight = 3;
+		float featureProfileWeight = 30;
 		float featureProfileCount = 7;
 
 		// non-feature patch
 		int k_set = 3;
+		int nonfeatureSpacing = 100;
 		float nonfeatureOverlapWeight = 1;
 		float nonfeatureGraphcutWeight = 1;
 
-
-		// alternative algorithm
-		enum {
+		// alternative patch-patch algorithm
+		static enum {
 			PATHPATCH_TPS,
 			PATHPATCH_CORNER_TPS,
 			PATHPATCH_ROTATE
@@ -119,7 +128,7 @@ namespace zhou {
 		else {
 
 			// rotation alternative
-			if (params.pathPatchAlgorithm == params.PATHPATCH_ROTATE && target.controlpoints.size() == 2) {
+			if (params.pathPatchAlgorithm == synthesisparams::PATHPATCH_ROTATE && target.controlpoints.size() == 2) {
 
 				// calculate the average outpath for the candidate
 				Vec2f candidateOut0 = normalize(candidate.controlpoints[0]);
@@ -164,7 +173,7 @@ namespace zhou {
 						spline.addPoint(target.controlpoints[n] + target.center, candidate.controlpoints[n] + candidate.center);
 					}
 					// corners
-					if (params.pathPatchAlgorithm == params.PATHPATCH_CORNER_TPS) {
+					if (params.pathPatchAlgorithm == synthesisparams::PATHPATCH_CORNER_TPS) {
 						spline.addPoint(target.center + Vec2f( hs1,  hs1), candidate.center + Vec2f( hs1,  hs1));
 						spline.addPoint(target.center + Vec2f( hs1, -hs1), candidate.center + Vec2f( hs1, -hs1));
 						spline.addPoint(target.center + Vec2f(-hs1,  hs1), candidate.center + Vec2f(-hs1,  hs1));
@@ -216,7 +225,7 @@ namespace zhou {
 
 				Vec2f targetOutpath = target.center + target.controlpoints[n];
 				Vec2f patchOutpath = patchCenter + target.controlpoints[n];
-				Vec2f perpendicular = normalize(Vec2f(target.controlpoints[n][1], target.controlpoints[n][0]));
+				Vec2f perpendicular = normalize(Vec2f(target.controlpoints[n][1], -target.controlpoints[n][0])) * 5;
 
 				//cout << "targetCenter: " << targetCenter << endl;
 				//cout << "targetOutpath: " << targetOutpath << endl;
@@ -322,8 +331,8 @@ namespace zhou {
 		// TODO for ridge and valley seperately
 		// 1) Identify features
 		//
-		ppa::FeatureGraph examplefeature(examplemap);
-		ppa::FeatureGraph sketchfeature(sketchmap);
+		ppa::FeatureGraph examplefeature(examplemap, params.ppaGridSpacing, params.profile_length);
+		ppa::FeatureGraph sketchfeature(sketchmap, params.ppaGridSpacing, params.profile_length);
 
 		// 2) Extract feature patches
 		//
@@ -371,7 +380,7 @@ namespace zhou {
 
 			// place patch
 			zhou::placePatch(synthesis, best.patch, best.graphcut, Vec2i(target.center[0] - hs1, target.center[1] - hs1));
-			imwrite("output/synthesis.png", synthesis);
+			//imwrite("output/synthesis.png", zhou::heightmapToImage(synthesis, 0, 4000));
 		}
 
 
@@ -382,6 +391,7 @@ namespace zhou {
 		auto cmp = [](const nonfeaturePatchTarget &left, const nonfeaturePatchTarget &right) { return left.overlappingPixels > right.overlappingPixels; };
 		priority_queue<nonfeaturePatchTarget, vector<nonfeaturePatchTarget>, decltype(cmp)> targetPatches(cmp);
 
+		int maxOverlap = params.patchsize * params.patchsize;
 		for (int offset = 0; offset < params.nonfeatureSpacing; offset += params.patchsize/2) {
 			for (int y = -hs1; y < synthesis.rows; y += params.nonfeatureSpacing) {
 				for (int x = -hs1; x < synthesis.cols; x += params.nonfeatureSpacing) {
@@ -408,9 +418,9 @@ namespace zhou {
 						}
 					}
 
-					
-
-					targetPatches.push(target);
+					if (target.overlappingPixels < maxOverlap) {
+						targetPatches.push(target);
+					}
 				}
 			}
 
@@ -431,7 +441,7 @@ namespace zhou {
 				}
 
 				zhou::placePatch(synthesis, best.patch, best.graphcut, target.position);
-				imwrite("output/synthesis.png", synthesis);
+				imwrite("output/synthesis.png", zhou::heightmapToImage(synthesis));
 			}
 		}
 

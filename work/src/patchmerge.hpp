@@ -218,17 +218,17 @@ namespace zhou {
 		poissonSeamRemoval(synthesis, synthesis_overlap, seam_mask);
 
 
-		// debug
-		Mat maskImage(synthesis.rows, synthesis.cols, CV_8UC3, Scalar(0));
-		for (int i = 0; i < maskImage.rows; i++) {
-			for (int j = 0; j < maskImage.cols; j++) {
-				if (synthesis_overlap.at<bool>(i, j))
-					maskImage.at<Vec3b>(i, j) = Vec3b(255, 255, 255);
-				if (seam_mask.at<bool>(i, j))
-					maskImage.at<Vec3b>(i, j) = Vec3b(0, 0, 255);
-			}
-		}
-		imwrite("output/maskiamge.png", maskImage);
+		//// debug
+		//Mat maskImage(synthesis.rows, synthesis.cols, CV_8UC3, Scalar(0));
+		//for (int i = 0; i < maskImage.rows; i++) {
+		//	for (int j = 0; j < maskImage.cols; j++) {
+		//		if (synthesis_overlap.at<bool>(i, j))
+		//			maskImage.at<Vec3b>(i, j) = Vec3b(255, 255, 255);
+		//		if (seam_mask.at<bool>(i, j))
+		//			maskImage.at<Vec3b>(i, j) = Vec3b(0, 0, 255);
+		//	}
+		//}
+		//imwrite("output/maskiamge.png", maskImage);
 
 
 		// done
